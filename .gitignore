@@ -1,0 +1,19 @@
+# Variables de entorno y credenciales sensibles
+.env
+.env.*
+
+# Dependencias de Node.js
+node_modules/
+npm-debug.log*
+
+# Respaldos y archivos temporales
+*.bak
+*.log
+*.tmp
+.DS_Store
+
+# Entornos y caché de Python
+__pycache__/
+*.py[cod]
+venv/
+.venv/

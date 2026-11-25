@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mane México - Control de Lotes de Producción</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+
+    <nav class="navbar navbar-dark bg-primary shadow-sm">
+        <div class="container-fluid">
+            <span class="navbar-brand mb-0 h1 font-monospace">🧪 MANE MÉXICO | Monitor de Fragancias y Lotes</span>
+        </div>
+    </nav>
+
+    <div class="container my-5">
+        <div class="row mb-4">
+            <div class="col">
+                <h2>Lotes Registrados en Planta</h2>
+                <p class="text-muted">Monitoreo en tiempo real conectado a la API de producción.</p>
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-body">
+                <h5 class="card-title mb-3">Registrar Nuevo Lote</h5>
+                <form id="form-lote">
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <label for="codigo_lote" class="form-label">Código de Lote</label>
+                            <input type="text" class="form-control" id="codigo_lote" placeholder="LOTE-MANE-2026-010" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="formula" class="form-label">Fórmula / Fragancia</label>
+                            <input type="text" class="form-control" id="formula" placeholder="Esencia Jazmín Blanco" required>
+                        </div>
+                        <div class="col-md-2">
+                            <label for="cantidad_litros" class="form-label">Litros</label>
+                            <input type="number" step="0.01" class="form-control" id="cantidad_litros" placeholder="250.00" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="linea_id" class="form-label">Línea de Producción</label>
+                            <select class="form-select" id="linea_id" required>
+                                <option value="1">1 - Línea A (Mezclado Fino)</option>
+                                <option value="2">2 - Línea B (Envasado Industrial)</option>
+                                <option value="3">3 - Línea C (Destilación)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <button type="submit" class="btn btn-primary">Guardar Lote</button>
+                    </div>
+                    <div id="mensaje-estado" class="mt-2"></div>
+                </form>
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0">
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>ID</th>
+                                <th>Código de Lote</th>
+                                <th>Fórmula / Fragancia</th>
+                                <th>Litros</th>
+                                <th>Línea ID</th>
+                                <th>Calidad</th>
+                                <th>Fecha de Registro</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-lotes"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function cargarLotes() {
+            try {
+                const respuesta = await fetch('/api/lotes');
+                const resultado = await respuesta.json();
+
+                if (resultado.success) {
+                    const tbody = document.getElementById('tabla-lotes');
+                    tbody.innerHTML = '';
+
+                    resultado.data.forEach(lote => {
+                        const fila = `
+                            <tr>
+                                <td>${lote.id}</td>
+                                <td class="fw-bold text-primary">${lote.codigo_lote}</td>
+                                <td>${lote.formula}</td>
+                                <td>${lote.cantidad_litros} L</td>
+                                <td><span class="badge bg-secondary">Línea ${lote.linea_id}</span></td>
+                                <td><span class="badge bg-info text-dark">🔍 ${lote.estado_calidad}</span></td>
+                                <td class="text-muted small">${new Date(lote.fecha_registro).toLocaleString()}</td>
+                            </tr>
+                        `;
+                        tbody.innerHTML += fila;
+                    });
+                }
+            } catch (error) {
+                console.error('Error al conectar con la API:', error);
+            }
+        }
+
+        document.getElementById('form-lote').addEventListener('submit', async function (evento) {
+            evento.preventDefault();
+
+            const nuevoLote = {
+                codigo_lote: document.getElementById('codigo_lote').value.trim(),
+                formula: document.getElementById('formula').value.trim(),
+                cantidad_litros: parseFloat(document.getElementById('cantidad_litros').value),
+                linea_id: parseInt(document.getElementById('linea_id').value, 10)
+            };
+
+            const mensajeDiv = document.getElementById('mensaje-estado');
+
+            try {
+                const respuesta = await fetch('/api/lotes', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(nuevoLote)
+                });
+
+                const resultado = await respuesta.json();
+
+                if (respuesta.ok && resultado.success) {
+                    mensajeDiv.innerHTML = `<div class="alert alert-success py-2">✅ ${resultado.message}</div>`;
+                    document.getElementById('form-lote').reset();
+                    cargarLotes();
+                } else {
+                    mensajeDiv.innerHTML = `<div class="alert alert-danger py-2">⚠️ ${resultado.message || 'No se pudo guardar el lote.'}</div>`;
+                }
+            } catch (error) {
+                console.error('Error al enviar el lote:', error);
+                mensajeDiv.innerHTML = `<div class="alert alert-danger py-2">❌ Error de conexión con el servidor.</div>`;
+            }
+        });
+
+        cargarLotes();
+    </script>
+</body>
+</html>
