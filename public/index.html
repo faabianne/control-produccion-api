@@ -69,6 +69,7 @@
                                 <th>Línea ID</th>
                                 <th>Calidad</th>
                                 <th>Fecha de Registro</th>
+                                <th>Acciones</th>
                             </tr>
                         </thead>
                         <tbody id="tabla-lotes"></tbody>
@@ -79,6 +80,17 @@
     </div>
 
     <script>
+        // Función auxiliar para asignar el color de la etiqueta según el estado
+        function obtenerBadgeCalidad(estado) {
+            if (estado === 'APROBADO') {
+                return `<span class="badge bg-success">✅ APROBADO</span>`;
+            }
+            if (estado === 'RECHAZADO') {
+                return `<span class="badge bg-danger">❌ RECHAZADO</span>`;
+            }
+            return `<span class="badge bg-info text-dark">🔍 ${estado}</span>`;
+        }
+        // Consulta los lotes y dibuja cada fila con sus botones de control
         async function cargarLotes() {
             try {
                 const respuesta = await fetch('/api/lotes');
@@ -96,8 +108,18 @@
                                 <td>${lote.formula}</td>
                                 <td>${lote.cantidad_litros} L</td>
                                 <td><span class="badge bg-secondary">Línea ${lote.linea_id}</span></td>
-                                <td><span class="badge bg-info text-dark">🔍 ${lote.estado_calidad}</span></td>
+                                <td>${obtenerBadgeCalidad(lote.estado_calidad)}</td>
                                 <td class="text-muted small">${new Date(lote.fecha_registro).toLocaleString()}</td>
+                                <td>
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        <button type="button" class="btn btn-outline-success" onclick="cambiarCalidad(${lote.id}, 'APROBADO')">
+                                            Aprobar
+                                        </button>
+                                        <button type="button" class="btn btn-outline-danger" onclick="cambiarCalidad(${lote.id}, 'RECHAZADO')">
+                                            Rechazar
+                                        </button>
+                                    </div>
+                                </td>
                             </tr>
                         `;
                         tbody.innerHTML += fila;
@@ -107,43 +129,65 @@
                 console.error('Error al conectar con la API:', error);
             }
         }
+        // Envía la petición PUT a Express para actualizar la calidad del lote
+        async function cambiarCalidad(id, nuevoEstado) {
+            try {
+                const respuesta = await fetch(`/api/lotes/${id}/calidad`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ estado_calidad: nuevoEstado })
+                });
 
-        document.getElementById('form-lote').addEventListener('submit', async function (evento) {
-            evento.preventDefault();
+                const resultado = await respuesta.json();
 
-            const nuevoLote = {
+                if (respuesta.ok && resultado.success) {
+                    // Refrescamos la tabla para ver el cambio de color al instante
+                    cargarLotes();
+                } else {
+                    alert(resultado.message || 'No se pudo actualizar el estado.');
+                }
+            } catch (error) {
+                console.error('Error en la petición PUT:', error);
+                alert('Error de conexión con el servidor.');
+            }
+        }
+        // Maneja el envío del formulario para registrar un nuevo lote (POST)
+        document.getElementById('form-lote').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const payload = {
                 codigo_lote: document.getElementById('codigo_lote').value.trim(),
                 formula: document.getElementById('formula').value.trim(),
                 cantidad_litros: parseFloat(document.getElementById('cantidad_litros').value),
                 linea_id: parseInt(document.getElementById('linea_id').value, 10)
             };
 
-            const mensajeDiv = document.getElementById('mensaje-estado');
+            const mensajeEl = document.getElementById('mensaje-estado');
 
             try {
                 const respuesta = await fetch('/api/lotes', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(nuevoLote)
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
                 });
-
                 const resultado = await respuesta.json();
 
                 if (respuesta.ok && resultado.success) {
-                    mensajeDiv.innerHTML = `<div class="alert alert-success py-2">✅ ${resultado.message}</div>`;
-                    document.getElementById('form-lote').reset();
+                    mensajeEl.innerHTML = `<div class="alert alert-success py-2 mb-0">${resultado.message}</div>`;
+                    e.target.reset();
                     cargarLotes();
                 } else {
-                    mensajeDiv.innerHTML = `<div class="alert alert-danger py-2">⚠️ ${resultado.message || 'No se pudo guardar el lote.'}</div>`;
+                    mensajeEl.innerHTML = `<div class="alert alert-danger py-2 mb-0">${resultado.message || 'Error al guardar el lote.'}</div>`;
                 }
             } catch (error) {
-                console.error('Error al enviar el lote:', error);
-                mensajeDiv.innerHTML = `<div class="alert alert-danger py-2">❌ Error de conexión con el servidor.</div>`;
+                console.error('Error al enviar formulario:', error);
+                mensajeEl.innerHTML = `<div class="alert alert-danger py-2 mb-0">Error de conexión con el servidor.</div>`;
             }
         });
 
+        // Dispara la carga inicial de lotes al abrir la página
         cargarLotes();
     </script>
 </body>

@@ -91,6 +91,52 @@ app.get('/api/lotes', async (req, res) => {
     }
 });
 
+// Ruta PUT para actualizar el estado de calidad de un lote específico
+app.put('/api/lotes/:id/calidad', async (req, res) => {
+    const { id } = req.params;
+    const { estado_calidad } = req.body;
+
+    // 1. Validación estricta: solo permitimos valores válidos de negocio
+    const estadosPermitidos = ['APROBADO', 'RECHAZADO', 'PENDIENTE'];
+    if (!estado_calidad || !estadosPermitidos.includes(estado_calidad)) {
+        return res.status(400).json({
+            success: false,
+            message: 'Estado de calidad inválido. Use APROBADO, RECHAZADO o PENDIENTE.'
+        });
+    }
+
+    try {
+        // 2. Actualización parametrizada en PostgreSQL (evita inyección SQL)
+        const query = `
+            UPDATE lotes
+            SET estado_calidad = $1
+            WHERE id = $2
+            RETURNING *;
+        `;
+        const resultado = await pool.query(query, [estado_calidad, id]);
+
+        // 3. Verificamos si existía un lote con ese ID
+        if (resultado.rowCount === 0) {
+            return res.status(404).json({
+                success: false,
+                message: `No se encontró ningún lote con ID ${id}.`
+            });
+        }
+
+        res.json({
+            success: true,
+            message: `Lote ${resultado.rows[0].codigo_lote} marcado como ${estado_calidad}.`,
+            data: resultado.rows[0]
+        });
+    } catch (error) {
+        console.error('Error al actualizar calidad del lote:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error interno al actualizar el estado de calidad.'
+        });
+    }
+});
+
 // 7. Encendemos el servidor en el puerto configurado (por defecto 3000)
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
